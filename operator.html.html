@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <title>EasyMart Remote Support - Operator Dashboard</title>
+    <style>
+        body { font-family: sans-serif; background: #f0f2f5; margin: 0; padding: 20px; }
+        .container { max-width: 1000px; margin: auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); display: flex; gap: 20px; }
+        .left-panel { flex: 2; }
+        .right-panel { flex: 1; display: flex; flex-direction: column; background: #f8f9fa; padding: 15px; border-radius: 8px; border: 1px solid #dee2e6; }
+        .control-box { margin-bottom: 15px; display: flex; gap: 10px; }
+        input[type="text"] { flex: 1; padding: 8px; font-size: 14px; border: 1px solid #ccc; border-radius: 4px; }
+        button { padding: 8px 15px; font-size: 14px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; }
+        button:hover { background: #0056b3; }
+        #screen-view { width: 100%; max-height: 400px; background: #000; border-radius: 4px; object-fit: contain; display: block; margin-top: 10px; }
+        .status { margin-bottom: 10px; font-weight: bold; color: #28a745; font-size: 14px; }
+        
+        /* ส่วนของกล่องแชท */
+        .chat-box { flex: 1; height: 350px; background: white; border: 1px solid #ccc; border-radius: 4px; overflow-y: scroll; padding: 10px; margin-bottom: 10px; display: flex; flex-direction: column; gap: 8px; }
+        .chat-message { padding: 8px 12px; border-radius: 6px; max-width: 80%; font-size: 14px; word-wrap: break-word; }
+        .chat-message.operator { background: #d1e7dd; align-self: flex-end; color: #0f5132; }
+        .chat-message.client { background: #cfe2ff; align-self: flex-start; color: #084298; }
+        .chat-input-box { display: flex; gap: 5px; }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <!-- ฝั่งซ้าย: หน้าจอรีโมท -->
+        <div class="left-panel">
+            <h2>ระบบซัพพอร์ตหน้าจอพนักงาน</h2>
+            <div class="control-box">
+                <input type="text" id="clientIdInput" placeholder="Client ID เช่น CLIENT-3117" value="CLIENT-3117">
+                <button onclick="connectToClient()">เชื่อมต่อหน้าจอ</button>
+            </div>
+            <div class="status" id="statusText">สถานะ: ยังไม่ได้เชื่อมต่อ</div>
+            <img id="screen-view" alt="รอภาพหน้าจอจากลูกค้า...">
+        </div>
+
+        <!-- ฝั่งขวา: ช่องแชท -->
+        <div class="right-panel">
+            <h3>ช่องแชทสนทนา</h3>
+            <div class="chat-box" id="chatContainer">
+                <div style="color: #888; text-align: center; font-size: 12px;">เริ่มการสนทนาที่นี่...</div>
+            </div>
+            <div class="chat-input-box">
+                <input type="text" id="chatInput" placeholder="พิมพ์ข้อความ..." onkeypress="handleKeyPress(event)">
+                <button onclick="sendChatMessage()">ส่ง</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <script>
+        const socket = io("http://localhost:3000");
+        let activeOperatorId = null;
+
+        socket.on("connect", () => {
+            activeOperatorId = socket.id;
+        });
+
+        function connectToClient() {
+            const clientId = document.getElementById("clientIdInput").value.trim();
+            if (!clientId) {
+                alert("กรุณากรอก Client ID ก่อนครับ");
+                return;
+            }
+
+            document.getElementById("statusText").innerText = "สถานะ: กำลังเชื่อมต่อไปยัง " + clientId + "...";
+            socket.emit("request-stream", { clientId: clientId });
+        }
+
+        socket.on("screen-frame", (data) => {
+            document.getElementById("statusText").innerText = "สถานะ: กำลังสตรีมหน้าจออยู่...";
+            document.getElementById("screen-view").src = "data:image/jpeg;base64," + data.image;
+        });
+
+        function sendChatMessage() {
+            const input = document.getElementById("chatInput");
+            const message = input.value.trim();
+            const clientId = document.getElementById("clientIdInput").value.trim();
+            
+            if (!message || !clientId) return;
+
+            // แสดงข้อฝั่งพนักงานเองทันที
+            appendChat("พนักงาน (คุณ)", message, "operator");
+
+            // ส่งผ่าน Server ไปหา Client
+            socket.emit("chat-message", {
+                sender: "พนักงาน",
+                clientId: clientId,
+                message: message
+            });
+
+            input.value = "";
+        }
+
+        function handleKeyPress(e) {
+            if (e.key === "Enter") sendChatMessage();
+        }
+
+        // รับข้อความตอบกลับจาก Client
+        socket.on("chat-message", (data) => {
+            appendChat(data.sender, data.message, "client");
+        });
+
+        function appendChat(sender, message, type) {
+            const container = document.getElementById("chatContainer");
+            const div = document.createElement("div");
+            div.className = `chat-message ${type}`;
+            div.innerHTML = `<b>${sender}:</b> ${message}`;
+            container.appendChild(div);
+            container.scrollTop = container.scrollHeight;
+        }
+    </script>
+</body>
+</html>

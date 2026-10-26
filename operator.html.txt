@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <title>EasyMart Remote Support - Operator Dashboard</title>
+    <style>
+        body { font-family: sans-serif; background: #f0f2f5; margin: 0; padding: 20px; }
+        .container { max-width: 900px; margin: auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        .control-box { margin-bottom: 20px; display: flex; gap: 10px; }
+        input[type="text"] { flex: 1; padding: 10px; font-size: 16px; border: 1px solid #ccc; border-radius: 4px; }
+        button { padding: 10px 20px; font-size: 16px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; }
+        button:hover { background: #0056b3; }
+        #screen-view { width: 100%; max-height: 500px; background: #000; border-radius: 4px; object-fit: contain; display: block; margin-top: 10px; }
+        .status { margin-top: 10px; font-weight: bold; color: #28a745; }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h2>ระบบซัพพอร์ตหน้าจอพนักงาน (Operator)</h2>
+        <div class="control-box">
+            <input type="text" id="clientIdInput" placeholder="กรอก Client ID เช่น CLIENT-3117" value="CLIENT-3117">
+            <button onclick="connectToClient()">เชื่อมต่อ & สตรีมหน้าจอ</button>
+        </div>
+        <div class="status" id="statusText">สถานะ: ยังไม่ได้เชื่อมต่อ</div>
+        
+        <h3>หน้าจอฝั่งลูกค้า:</h3>
+        <img id="screen-view" alt="รอภาพหน้าจอจากลูกค้า...">
+    </div>
+
+    <!-- โหลด Socket.io จาก CDN -->
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <script>
+        const socket = io("http://localhost:3000");
+
+        socket.on("connect", () => {
+            console.log("Operator Connected to Server ID:", socket.id);
+        });
+
+        function connectToClient() {
+            const clientId = document.getElementById("clientIdInput").value.trim();
+            if (!clientId) {
+                alert("กรุณากรอก Client ID ก่อนครับ");
+                return;
+            }
+
+            document.getElementById("statusText").innerText = "สถานะ: กำลังส่งคำขอเชื่อมต่อไปยัง " + clientId + "...";
+            
+            // ส่งคำขอไปยัง Server เพื่อบอกให้ Client เริ่มสตรีมภาพ
+            socket.emit("request-stream", { clientId: clientId });
+        }
+
+        // รับภาพหน้าจอเฟรมต่อเฟรมจาก Client
+        socket.on("screen-frame", (data) => {
+            document.getElementById("statusText").innerText = "สถานะ: กำลังสตรีมหน้าจออยู่...";
+            const imgElement = document.getElementById("screen-view");
+            imgElement.src = "data:image/jpeg;base64," + data.image;
+        });
+    </script>
+</body>
+</html>
