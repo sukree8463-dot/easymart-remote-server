@@ -1,4 +1,4 @@
-    {
+   {
      "name": "remote-server",
      "version": "1.0.0",
      "description": "EasyMart Remote Signaling Server",
